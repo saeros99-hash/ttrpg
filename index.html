@@ -240,6 +240,21 @@ a{color:var(--accent2)}
 .sb-item.act i{color:var(--accent2)}
 .sb-item-lbl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sb-empty{padding:3px 10px 6px 28px;font-size:11px;color:var(--t4);font-style:italic}
+.sb-item.sub{padding-left:44px}
+.sb-item.sub2{padding-left:60px}
+.sb-item.drag-over{background:var(--accentbg);border-left-color:var(--accent)}
+.sb-cat-hdr.drag-over{background:var(--accentbg)}
+.sb-item .sb-add-sub{display:none;font-size:10px;color:var(--t3);padding:1px 4px;border-radius:3px;cursor:pointer;margin-left:2px;flex-shrink:0}
+.sb-item:hover .sb-add-sub{display:flex;align-items:center}
+.sb-item .sb-add-sub:hover{background:var(--accentbg);color:var(--accent)}
+.sb-item.sub{padding-left:44px}
+.sb-item.sub2{padding-left:60px}
+.sb-item.drag-over{background:var(--accentbg);border-left-color:var(--accent)}
+.sb-cat-hdr.drag-over{background:var(--accentbg)}
+.sb-item .sb-add-sub{display:none;font-size:10px;color:var(--t3);padding:1px 4px;border-radius:3px;cursor:pointer;margin-left:2px;flex-shrink:0}
+.sb-item:hover .sb-add-sub{display:flex;align-items:center}
+.sb-item .sb-add-sub:hover{background:var(--accentbg);color:var(--accent)}
+.sb-item.has-children > .sb-item-lbl::before{content:'▾ ';font-size:10px;color:var(--t3)}
 
 /* ─── MAIN ─── */
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:transparent}
@@ -1554,7 +1569,7 @@ label.tb{line-height:1}
               <div class="tree-legend" id="treeLegend"></div>
             </div>
             <div class="tree-canvas" id="treeCanvas">
-              <svg class="tree-svg" id="treeSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+              <svg class="tree-svg" id="treeSvg" xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;width:100%;height:100%;overflow:visible;pointer-events:none"></svg>
               <div id="treeNodes"></div>
               <div class="tree-controls">
                 <button class="tree-ctrl-btn" onclick="treeZoom(1.2)" title="Увеличить"><i class="ti ti-plus"></i></button>
@@ -1623,7 +1638,13 @@ label.tb{line-height:1}
   <div class="modal modal-sm" onclick="event.stopPropagation()">
     <div class="mh"><div class="mh-title">Добавить тег</div><button class="mh-close" onclick="closeOv('ovTag')"><i class="ti ti-x"></i></button></div>
     <div class="mb">
-      <div class="fg"><label class="fl">Текст тега</label><input class="fi mo" id="tagInp" placeholder="#название" onkeydown="if(event.key==='Enter')addTagOk()"></div>
+      <div class="fg">
+        <label class="fl">Текст тега</label>
+        <input class="fi mo" id="tagInp" placeholder="#название" autocomplete="off"
+          oninput="filterTagSuggestions(this.value)"
+          onkeydown="tagInpKey(event)">
+        <div id="tagSuggestions" style="display:none;max-height:160px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;margin-top:4px"></div>
+      </div>
       <div class="fg"><label class="fl">Цвет</label><div class="cdots" id="tagCdots">
         <div class="cdot sel" data-c="0" style="background:var(--accent)" onclick="selTagC(0,this)"></div>
         <div class="cdot" data-c="1" style="background:var(--accent)" onclick="selTagC(1,this)"></div>
@@ -1799,17 +1820,7 @@ label.tb{line-height:1}
 
 <script>
 // ═══════ FIREBASE ═══════
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyB1lYtMgVVTEu5QqkCrMpVPW3BW7jMEBD4",
-  authDomain: "project-8013209213768389923.firebaseapp.com",
-  databaseURL: "https://project-8013209213768389923-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "project-8013209213768389923",
-  storageBucket: "project-8013209213768389923.firebasestorage.app",
-  messagingSenderId: "815969873664",
-  appId: "1:815969873664:web:91d16c3d6e64e775d94de5",
-  measurementId: "G-RNZP3E32PX"
-};
+const FB={apiKey:"AIzaSyB1lYtMgVVTEu5QqkCrMpVPW3BW7jMEBD4",authDomain:"project-8013209213768389923.firebaseapp.com",databaseURL:"https://project-8013209213768389923-default-rtdb.europe-west1.firebasedatabase.app",projectId:"project-8013209213768389923",storageBucket:"project-8013209213768389923.firebasestorage.app",messagingSenderId:"815969873664",appId:"1:815969873664:web:91d16c3d6e64e775d94de5",measurementId:"G-RNZP3E32PX"};
 let db,storage;
 
 // ═══════ STATE ═══════
@@ -1948,9 +1959,39 @@ async function loadData(){
 function renderSbSec(){
   const el=g('sbSections');if(!campId){el.innerHTML='';return;}
   el.innerHTML=CATS.map(cat=>{
-    const items=entries.filter(e=>e.cat===cat.id);
+    const roots=entries.filter(e=>e.cat===cat.id&&!e.parentId);
     const coll=collSec.has(cat.id);
-    return`<div class="sb-cat">
+    function renderItems(items,depth){
+      if(!items.length)return depth===0?'<div class="sb-empty">нет записей</div>':'';
+      return items.map(e=>{
+        const children=entries.filter(x=>x.parentId===e.id);
+        const hasKids=children.length>0;
+        const isColl=collSec.has('item:'+e.id);
+        const indent=depth===0?'':depth===1?'sub':'sub2';
+        return`<div class="sb-item-wrap">
+          <div class="sb-item${indent?' '+indent:''}${e.id===activeId?' act':''}${hasKids?' has-children':''}"
+            id="sbi_${e.id}"
+            onclick="openEntry('${e.id}')"
+            ondblclick="event.stopPropagation();openEntry('${e.id}')"
+            draggable="true"
+            ondragstart="sbDragStart(event,'${e.id}')"
+            ondragover="sbDragOver(event,'${e.id}')"
+            ondragleave="sbDragLeave(event)"
+            ondrop="sbDrop(event,'${e.id}')">
+            ${hasKids?`<i class="ti ti-chevron-down ch sb-ch${isColl?' coll':''}" style="font-size:10px;transition:transform .15s;${isColl?'transform:rotate(-90deg)':''}" onclick="event.stopPropagation();toggleSbItem('${e.id}')"></i>`:'<span style="width:14px;flex-shrink:0"></span>'}
+            <i class="ti ${TICONS[e.etype]||'ti-file'}"></i>
+            <span class="sb-item-lbl">${esc(e.title||'Без названия')}</span>
+            <span class="sb-add-sub" title="Добавить подраздел" onclick="event.stopPropagation();openNewSubEntry('${e.id}','${cat.id}')"><i class="ti ti-plus" style="font-size:10px"></i></span>
+            <i class="ti ti-x sb-del" onclick="event.stopPropagation();deleteEntry('${e.id}')"></i>
+          </div>
+          ${hasKids?`<div class="sb-children${isColl?' coll':''}" id="sbC_${e.id}" style="${isColl?'display:none':''}">${renderItems(children,depth+1)}</div>`:''}
+        </div>`;
+      }).join('');
+    }
+    return`<div class="sb-cat"
+      ondragover="sbCatDragOver(event,'${cat.id}')"
+      ondragleave="sbDragLeave(event)"
+      ondrop="sbCatDrop(event,'${cat.id}')">
       <div class="sb-cat-hdr${coll?' coll':''}" id="sbH_${cat.id}" onclick="toggleSbCat('${cat.id}')">
         <i class="ti ti-chevron-down ch"></i>
         <i class="ti ${cat.ico} sb-cat-ico"></i>
@@ -1958,15 +1999,91 @@ function renderSbSec(){
         <div class="sb-plus" title="Добавить в ${cat.lbl}" onclick="event.stopPropagation();openNewEntry('${cat.id}')"><i class="ti ti-plus"></i></div>
       </div>
       <div class="sb-items${coll?' coll':''}" id="sbI_${cat.id}">
-        ${items.length?items.map(e=>`
-          <div class="sb-item${e.id===activeId?' act':''}" onclick="openEntry('${e.id}')" id="sbi_${e.id}">
-            <i class="ti ${TICONS[e.etype]||'ti-file'}"></i>
-            <span class="sb-item-lbl">${esc(e.title||'Без названия')}</span>
-            <i class="ti ti-x sb-del" onclick="event.stopPropagation();deleteEntry('${e.id}')"></i>
-          </div>`).join(''):'<div class="sb-empty">нет записей</div>'}
+        ${renderItems(roots,0)}
       </div>
     </div>`;
   }).join('');
+}
+// ─── Sub-entry ───
+function openNewSubEntry(parentId, cat){
+  if(!campId){notify('Сначала создайте кампанию','inf');return;}
+  selEType='wiki';
+  g('entryCat').value=cat;g('entryType').value='wiki';g('entryName').value='';
+  g('entryModalT').textContent='Новый подраздел';
+  document.querySelectorAll('.type-card').forEach(c=>c.classList.toggle('sel',c.dataset.t==='wiki'));
+  _pendingParentId=parentId;
+  openOv('ovEntry');setTimeout(()=>g('entryName').focus(),60);
+}
+let _pendingParentId=null;
+
+// ─── Drag & Drop sidebar ───
+let _sbDragId=null;
+function sbDragStart(ev,id){
+  _sbDragId=id;ev.dataTransfer.effectAllowed='move';
+  ev.dataTransfer.setData('text/plain',id);
+  setTimeout(()=>{const el=g('sbi_'+id);if(el)el.style.opacity='.4';},0);
+}
+function sbDragOver(ev,targetId){
+  if(!_sbDragId||_sbDragId===targetId)return;
+  ev.preventDefault();ev.dataTransfer.dropEffect='move';
+  document.querySelectorAll('.sb-item.drag-over,.sb-cat-hdr.drag-over').forEach(e=>e.classList.remove('drag-over'));
+  const el=g('sbi_'+targetId);if(el)el.classList.add('drag-over');
+}
+function sbCatDragOver(ev,catId){
+  if(!_sbDragId)return;
+  ev.preventDefault();ev.dataTransfer.dropEffect='move';
+}
+function sbDragLeave(ev){
+  if(!ev.relatedTarget||!ev.currentTarget.contains(ev.relatedTarget)){
+    document.querySelectorAll('.sb-item.drag-over,.sb-cat-hdr.drag-over').forEach(e=>e.classList.remove('drag-over'));
+  }
+}
+async function sbDrop(ev,targetId){
+  ev.preventDefault();ev.stopPropagation();
+  document.querySelectorAll('.sb-item.drag-over,.sb-cat-hdr.drag-over').forEach(e=>e.classList.remove('drag-over'));
+  const dragId=_sbDragId;_sbDragId=null;
+  if(!dragId||dragId===targetId)return;
+  // Prevent making an item its own descendant
+  function isDescendant(parentId,childId){
+    let cur=entries.find(x=>x.id===childId);
+    while(cur&&cur.parentId){if(cur.parentId===parentId)return true;cur=entries.find(x=>x.id===cur.parentId);}
+    return false;
+  }
+  if(isDescendant(dragId,targetId))return;
+  const dragged=entries.find(x=>x.id===dragId);
+  const target=entries.find(x=>x.id===targetId);
+  if(!dragged||!target)return;
+  // Drop onto item: make it a child of target
+  dragged.parentId=targetId;
+  dragged.cat=target.cat;
+  try{
+    await db.collection('campaigns').doc(campId).collection('entries').doc(dragId).update({parentId:targetId,cat:target.cat});
+    renderSbSec();notify('Перемещено','ok');
+  }catch(e){notify('Ошибка: '+e.message,'err');}
+}
+async function sbCatDrop(ev,catId){
+  ev.preventDefault();
+  document.querySelectorAll('.sb-item.drag-over,.sb-cat-hdr.drag-over').forEach(e=>e.classList.remove('drag-over'));
+  const dragId=_sbDragId;_sbDragId=null;
+  if(!dragId)return;
+  const dragged=entries.find(x=>x.id===dragId);if(!dragged)return;
+  // Drop onto category header: move to root of that category
+  dragged.parentId=null;dragged.cat=catId;
+  try{
+    await db.collection('campaigns').doc(campId).collection('entries').doc(dragId).update({parentId:null,cat:catId});
+    renderSbSec();notify('Перемещено в '+( CATS.find(c=>c.id===catId)?.lbl||catId),'ok');
+  }catch(e){notify('Ошибка: '+e.message,'err');}
+  // Reset opacity
+  const el=g('sbi_'+dragId);if(el)el.style.opacity='';
+}
+
+function toggleSbItem(id){
+  const key='item:'+id;
+  collSec.has(key)?collSec.delete(key):collSec.add(key);
+  const el=g('sbC_'+id);
+  const ch=g('sbi_'+id)?.querySelector('.sb-ch');
+  if(el){el.style.display=collSec.has(key)?'none':'';}
+  if(ch){ch.style.transform=collSec.has(key)?'rotate(-90deg)':'rotate(0deg)';}
 }
 function toggleSbCat(cat){
   collSec.has(cat)?collSec.delete(cat):collSec.add(cat);
@@ -2014,8 +2131,43 @@ function renderWikiTags(tags){
   const b=document.createElement('button');b.className='tag-add';b.textContent='+ тег';b.onclick=openTagOv;m.appendChild(b);
 }
 function openTagOv(){
-  g('tagInp').value='';curTagC=0;document.querySelectorAll('#tagCdots .cdot').forEach((d,i)=>d.classList.toggle('sel',i===0));
+  g('tagInp').value='';curTagC=0;
+  document.querySelectorAll('#tagCdots .cdot').forEach((d,i)=>d.classList.toggle('sel',i===0));
+  filterTagSuggestions('');
   openOv('ovTag');setTimeout(()=>g('tagInp').focus(),50);
+}
+function getAllTags(){
+  const map={};
+  entries.forEach(e=>(e.tags||[]).forEach(t=>{
+    const key=(t.text||'').toLowerCase();
+    if(key&&!map[key])map[key]={text:t.text,c:t.c||0};
+  }));
+  return Object.values(map).sort((a,b)=>a.text.localeCompare(b.text));
+}
+function filterTagSuggestions(val){
+  const box=g('tagSuggestions');if(!box)return;
+  const all=getAllTags();
+  const q=(val||'').toLowerCase().replace(/^#/,'');
+  const filtered=q?all.filter(t=>t.text.toLowerCase().includes(q)):all;
+  if(!filtered.length){box.style.display='none';return;}
+  box.style.display='block';
+  const TC=['var(--accent)','var(--accent)','var(--amber)','var(--red)','var(--purple)','var(--t3)'];
+  box.innerHTML=filtered.map(t=>`
+    <div class="tag-sug-item" onclick="selectTagSuggestion('${t.text.replace(/'/g,'&#39;')}',${t.c||0})"
+      style="display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:pointer;font-size:12px;color:var(--t2);transition:background .1s"
+      onmouseover="this.style.background='var(--glass2)'" onmouseout="this.style.background=''">
+      <span style="width:8px;height:8px;border-radius:50%;background:${TC[t.c||0]};flex-shrink:0"></span>
+      ${esc(t.text)}
+    </div>`).join('');
+}
+function selectTagSuggestion(text,c){
+  g('tagInp').value=text;
+  selTagC(c,document.querySelectorAll('#tagCdots .cdot')[c]);
+  g('tagSuggestions').style.display='none';
+}
+function tagInpKey(ev){
+  if(ev.key==='Enter'){addTagOk();return;}
+  if(ev.key==='Escape'){g('tagSuggestions').style.display='none';return;}
 }
 function selTagC(c,el){curTagC=c;document.querySelectorAll('#tagCdots .cdot').forEach(d=>d.classList.remove('sel'));el.classList.add('sel');}
 function addTagOk(){
@@ -2549,6 +2701,10 @@ function renderTree(){
       `<div class="tree-node-body"><div class="tree-node-title">${esc(e.title||'Без названия')}</div>`+
       `<div class="tree-node-cat" style="color:${col}">${esc(CATS.find(c=>c.id===e.cat)?.lbl||'')}</div></div>`+
       `<div class="tn-lh" title="Тяни → на другой узел" style="position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:700;cursor:crosshair;opacity:.75">+</div>`;
+    // Double click → open entry
+    node.addEventListener('dblclick',function(ev){
+      ev.stopPropagation();openEntry(e.id);
+    });
     // Move drag
     node.addEventListener('mousedown',function(ev){
       if(ev.button!==0||ev.target.classList.contains('tn-lh'))return;
@@ -2739,56 +2895,126 @@ function renderCloudSvg(){
   const sc=cloudTransform.scale,tx=cloudTransform.x,ty=cloudTransform.y;
   svg.setAttribute('viewBox','0 0 '+W+' '+H);
   svg.setAttribute('width',W);svg.setAttribute('height',H);
+  const NS='http://www.w3.org/2000/svg';
   const nm={};cloudNodes.forEach(n=>nm[n.id]=n);
-  let html='';
-  // Edges
-  cloudEdges.forEach(e=>{
+
+  // ── Helper: get or create SVG child by key ──
+  function getOrCreate(tag,key){
+    let el=svg.querySelector('[data-key="'+key+'"]');
+    if(!el){el=document.createElementNS(NS,tag);el.setAttribute('data-key',key);svg.appendChild(el);}
+    return el;
+  }
+
+  // ── Remove stale elements ──
+  const usedKeys=new Set();
+
+  // ── Edges ──
+  cloudEdges.forEach((e,ei)=>{
     const s=nm[e.s],t=nm[e.t];if(!s||!t)return;
     const sx=s.x*sc+tx,sy=s.y*sc+ty,ex=t.x*sc+tx,ey=t.y*sc+ty;
     const hl=cloudHoverId&&(e.s===cloudHoverId||e.t===cloudHoverId);
     const col=e.isTag?'rgba(122,171,255,.35)':(REL_COLORS[e.label]||'rgba(122,171,255,.5)');
-    html+=`<line x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}" stroke="${hl?'#7aabff':col}" stroke-width="${hl?2.5:1.5}" opacity="${hl?1:.7}"/>`;
-    if(e.label&&sc>.6)html+=`<text x="${(sx+ex)/2}" y="${(sy+ey)/2-5}" text-anchor="middle" font-size="${Math.max(8,9*sc)}" fill="rgba(180,210,255,.7)" font-family="Inter,sans-serif" style="pointer-events:none">${esc(e.label)}</text>`;
+    const k='edge-'+ei;usedKeys.add(k);
+    const el=getOrCreate('line',k);
+    el.setAttribute('x1',sx);el.setAttribute('y1',sy);
+    el.setAttribute('x2',ex);el.setAttribute('y2',ey);
+    el.setAttribute('stroke',hl?'#7aabff':col);
+    el.setAttribute('stroke-width',hl?2.5:1.5);
+    el.setAttribute('opacity',hl?1:.7);
+    el.style.pointerEvents='none';
+    if(e.label&&sc>.6){
+      const kt='elbl-'+ei;usedKeys.add(kt);
+      const tl=getOrCreate('text',kt);
+      tl.setAttribute('x',(sx+ex)/2);tl.setAttribute('y',(sy+ey)/2-5);
+      tl.setAttribute('text-anchor','middle');tl.setAttribute('font-size',Math.max(8,9*sc));
+      tl.setAttribute('fill','rgba(180,210,255,.7)');tl.setAttribute('font-family','Inter,sans-serif');
+      tl.style.pointerEvents='none';
+      tl.textContent=e.label;
+    }
   });
-  // Link drag preview
+
+  // ── Link drag preview ──
   if(_cd?.type==='link'){
-    html+=`<line x1="${_cd.sx}" y1="${_cd.sy}" x2="${_cd.cx}" y2="${_cd.cy}" stroke="#7aabff" stroke-width="2.5" stroke-dasharray="7,3" opacity=".95" style="pointer-events:none"/>`;
+    const k='link-preview';usedKeys.add(k);
+    const el=getOrCreate('line',k);
+    el.setAttribute('x1',_cd.sx);el.setAttribute('y1',_cd.sy);
+    el.setAttribute('x2',_cd.cx);el.setAttribute('y2',_cd.cy);
+    el.setAttribute('stroke','#7aabff');el.setAttribute('stroke-width',2.5);
+    el.setAttribute('stroke-dasharray','7,3');el.setAttribute('opacity',.95);
+    el.style.pointerEvents='none';
   }
-  // Nodes — circles + labels
+
+  // ── Nodes: circles first, then text on top ──
   cloudNodes.forEach(n=>{
     const nx=n.x*sc+tx,ny=n.y*sc+ty,nr=n.r*sc;
     const TC=['#4f8ef7','#34c77b','#f0a830','#f05070','#a070f0','rgba(255,255,255,.5)'];
     const col=n.isTag?(TC[n.tagColor]||'#7aabff'):(CLOUD_CAT_COLORS[n.cat]||'#7aabff');
     const isHl=n.id===cloudHoverId||(_cd?.type==='link'&&_cd.id===n.id);
     const isDragged=_cd?.type==='node'&&_cd.id===n.id;
-    html+=`<circle cx="${nx}" cy="${ny}" r="${nr}" fill="${col}${isHl?'35':'18'}" stroke="${col}" stroke-width="${isHl||isDragged?3:1.5}" data-nid="${n.id}" style="cursor:${isDragged?'grabbing':'grab'}"/>`;
+
+    const kc='node-c-'+n.id;usedKeys.add(kc);
+    const circ=getOrCreate('circle',kc);
+    circ.setAttribute('cx',nx);circ.setAttribute('cy',ny);circ.setAttribute('r',nr);
+    circ.setAttribute('fill',col+(isHl?'35':'18'));
+    circ.setAttribute('stroke',col);
+    circ.setAttribute('stroke-width',isHl||isDragged?3:1.5);
+    circ.setAttribute('data-nid',n.id);
+    circ.style.cursor=isDragged?'grabbing':'grab';
+
     const fs=Math.max(9,Math.min(13,nr*.9));
-    if(sc>.3)html+=`<text x="${nx}" y="${ny+fs*.36}" text-anchor="middle" font-size="${fs}" fill="${isHl?'#fff':'rgba(220,235,255,.92)'}" font-weight="${isHl?600:400}" font-family="Inter,sans-serif" style="pointer-events:none;user-select:none">${esc(n.title.length>16?n.title.slice(0,15)+'…':n.title)}</text>`;
+    if(sc>.3){
+      const kt='node-t-'+n.id;usedKeys.add(kt);
+      const txt=getOrCreate('text',kt);
+      txt.setAttribute('x',nx);txt.setAttribute('y',ny+fs*.36);
+      txt.setAttribute('text-anchor','middle');txt.setAttribute('font-size',fs);
+      txt.setAttribute('fill',isHl?'#fff':'rgba(220,235,255,.92)');
+      txt.setAttribute('font-weight',isHl?600:400);
+      txt.setAttribute('font-family','Inter,sans-serif');
+      txt.setAttribute('data-nid',n.id);
+      txt.style.pointerEvents='none';txt.style.userSelect='none';
+      txt.textContent=n.title.length>16?n.title.slice(0,15)+'…':n.title;
+    }
   });
-  svg.innerHTML=html;
-  // Attach events to circles after render
-  svg.querySelectorAll('circle[data-nid]').forEach(el=>{
-    el.addEventListener('mouseenter',ev=>{cloudHoverId=el.dataset.nid;showCloudTooltip(el.dataset.nid,ev);renderCloudSvg();});
-    el.addEventListener('mouseleave',()=>{cloudHoverId=null;hideCloudTooltip();renderCloudSvg();});
-    el.addEventListener('click',ev=>{if(!_cd)cloudClickNode(el.dataset.nid);});
-    el.addEventListener('mousedown',ev=>{
+
+  // ── Remove stale elements ──
+  Array.from(svg.querySelectorAll('[data-key]')).forEach(el=>{
+    if(!usedKeys.has(el.getAttribute('data-key')))el.remove();
+  });
+
+  // ── Reorder: edges behind nodes ──
+  svg.querySelectorAll('[data-key^="node-"]').forEach(el=>svg.appendChild(el));
+
+  // ── Attach events to circles (only if not already attached) ──
+  svg.querySelectorAll('circle[data-nid]').forEach(circ=>{
+    if(circ._eventsAttached)return;
+    circ._eventsAttached=true;
+    const nid=circ.getAttribute('data-nid');
+    circ.addEventListener('mouseenter',ev=>{cloudHoverId=nid;showCloudTooltip(nid,ev);if(!_cd)renderCloudSvg();});
+    circ.addEventListener('mouseleave',()=>{cloudHoverId=null;hideCloudTooltip();if(!_cd)renderCloudSvg();});
+    circ.addEventListener('click',ev=>{if(!_cd)cloudClickNode(nid);});
+    circ.addEventListener('dblclick',ev=>{
       ev.stopPropagation();ev.preventDefault();
-      const id=el.dataset.nid;
+      if(nid.startsWith('tag:'))return;
+      if(nid.startsWith('char:')){openCharModal(nid.slice(5));return;}
+      openEntry(nid);
+    });
+    circ.addEventListener('mousedown',ev=>{
+      ev.stopPropagation();ev.preventDefault();
+      const n=cloudNodes.find(x=>x.id===nid);if(!n)return;
       const cvr=g('cloudCanvas').getBoundingClientRect();
-      const n=cloudNodes.find(x=>x.id===id);if(!n)return;
       if(ev.shiftKey){
         const sc2=cloudTransform.scale;
-        _cd={type:'link',id,sx:n.x*sc2+cloudTransform.x,sy:n.y*sc2+cloudTransform.y,cx:ev.clientX-cvr.left,cy:ev.clientY-cvr.top};
+        _cd={type:'link',id:nid,sx:n.x*sc2+cloudTransform.x,sy:n.y*sc2+cloudTransform.y,cx:ev.clientX-cvr.left,cy:ev.clientY-cvr.top};
       } else {
-        // store offset from node-center to cursor in canvas-local (unscaled) coords
         const sc2=cloudTransform.scale,tx2=cloudTransform.x,ty2=cloudTransform.y;
-        _cd={type:'node',id,
+        _cd={type:'node',id:nid,
           ox:(ev.clientX-cvr.left-tx2)/sc2 - n.x,
           oy:(ev.clientY-cvr.top -ty2)/sc2 - n.y};
       }
     });
   });
-  // Legend
+
+  // ── Legend ──
   const leg=g('cloudLegend');if(leg){
     const used=[...new Set(cloudNodes.map(n=>n.cat))];
     leg.innerHTML=used.map(cat=>{
@@ -2878,10 +3104,12 @@ document.addEventListener('mouseup',async function cloudMU(ev){
 (function initCloudCanvas(){
   function setup(){
     const cv=g('cloudCanvas');if(!cv)return;
+    // Pan starts ONLY on the SVG background (target===svg), not on circles/text/lines
     cv.addEventListener('mousedown',ev=>{
-      // don't start pan when clicking on a node/edge or when node drag is already active
-      if(ev.target.tagName==='circle'||ev.target.tagName==='text'||ev.target.tagName==='line')return;
-      if(_cd&&_cd.type==='node')return;
+      const tag=ev.target.tagName.toLowerCase();
+      if(tag==='circle'||tag==='text'||tag==='line'||tag==='path')return;
+      if(ev.target.dataset&&ev.target.dataset.nid)return;
+      if(_cd)return;
       _cd={type:'pan',ox:ev.clientX-cloudTransform.x,oy:ev.clientY-cloudTransform.y};
     });
     cv.addEventListener('wheel',ev=>{ev.preventDefault();cloudZoom(ev.deltaY<0?1.12:.88);},{passive:false});
@@ -2995,13 +3223,28 @@ async function confirmEntry(){
   const etype=g('entryType').value;
   if(!name){g('entryName').focus();return;}
   closeOv('ovEntry');
+  // Build tag chain: category tag + all ancestor entry tags
+  const autoTags=[];
   const catDef=CATS.find(c=>c.id===cat);
-  const autoTag=catDef?{text:'#'+catDef.lbl,c:CATS.indexOf(catDef)%6}:null;
+  if(catDef) autoTags.push({text:'#'+catDef.lbl,c:CATS.indexOf(catDef)%6});
+  // Walk parent chain and add a tag for each ancestor
+  if(_pendingParentId){
+    const chain=[];
+    let cur=entries.find(x=>x.id===_pendingParentId);
+    while(cur){chain.unshift(cur);cur=cur.parentId?entries.find(x=>x.id===cur.parentId):null;}
+    const TC=[0,1,2,3,4,5];
+    chain.forEach((ancestor,i)=>{
+      const t=ancestor.title?'#'+ancestor.title.replace(/\s+/g,'_'):'';
+      if(t&&!autoTags.find(x=>x.text===t)) autoTags.push({text:t,c:TC[i%TC.length]});
+    });
+  }
   try{
-    const data={title:name,cat,etype,content:'',tags:autoTag?[autoTag]:[],kCols:[],mapUrl:'',
+    const data={title:name,cat,etype,content:'',tags:autoTags,kCols:[],mapUrl:'',
       order:entries.filter(e=>e.cat===cat).length,
+      parentId:_pendingParentId||null,
       createdAt:firebase.firestore.FieldValue.serverTimestamp(),
       updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+    _pendingParentId=null;
     const ref=await db.collection('campaigns').doc(campId).collection('entries').add(data);
     entries.push({id:ref.id,...data});
     renderSbSec();openEntry(ref.id);
@@ -3255,12 +3498,7 @@ function wikiInsBox(){
     ['Предупреждение','border:1px solid #e0a83a;background:rgba(224,168,58,.07)'],
     ['Опасность','border:1px solid var(--red,#e05c5c);background:rgba(224,92,92,.07)']
   ];
-  const choice=prompt('Тип блока:
-1. Обычный
-2. Информация
-3. Предупреждение
-4. Опасность
-(введите 1-4)');
+  const choice=prompt('Тип блока:\n1. Обычный\n2. Информация\n3. Предупреждение\n4. Опасность\n(введите 1-4)');
   const idx=(parseInt(choice)||1)-1;
   const [,style]=types[Math.max(0,Math.min(3,idx))];
   const body=g('wikiBody');if(body)body.focus();
