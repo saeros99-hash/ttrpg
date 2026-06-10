@@ -7,7 +7,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <style>
@@ -733,7 +732,7 @@ label.tb{line-height:1}
 }
 
 /* ─── AUTH SCREEN ─── */
-#authScreen{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:var(--bg-grad)}
+#authScreen{position:fixed;inset:0;z-index:10000;display:none;align-items:center;justify-content:center;background:var(--bg-grad)}
 #authScreen::before{content:'';position:fixed;inset:0;background:var(--orb1),var(--orb2),var(--orb3);pointer-events:none}
 .auth-box{position:relative;z-index:1;background:rgba(12,20,48,.9);backdrop-filter:blur(28px);border:1px solid var(--border2);border-radius:18px;padding:36px 38px;width:420px;max-width:95vw;box-shadow:0 24px 80px rgba(0,0,0,.7)}
 .auth-logo{font-family:'Lora',serif;font-size:26px;font-weight:600;color:var(--t);text-align:center;margin-bottom:6px}
@@ -757,7 +756,7 @@ label.tb{line-height:1}
 .auth-user-badge:hover{border-color:var(--red);color:var(--red)}
 .auth-user-badge img{width:22px;height:22px;border-radius:50%}
 /* ─── PIN LOCK SCREEN ─── */
-#pinScreen{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;background:rgba(5,10,25,.92);backdrop-filter:blur(20px)}
+#pinScreen{position:fixed;inset:0;z-index:10001;display:none;align-items:center;justify-content:center;background:rgba(5,10,25,.92);backdrop-filter:blur(20px)}
 #pinScreen.open{display:flex}
 .pin-box{background:rgba(12,20,48,.97);border:1px solid var(--border2);border-radius:16px;padding:32px 36px;width:340px;max-width:95vw;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.8)}
 .pin-box h3{font-family:'Lora',serif;font-size:18px;font-weight:600;color:var(--t);margin-bottom:6px}
@@ -1327,8 +1326,9 @@ label.tb{line-height:1}
 }
 @media(max-width:400px){
   .chars-grid{grid-template-columns:1fr 1fr}
-  .media-grid{grid-template-columns:1fr 1fr}
+  .media-grid{grid-template-columns:1fr 1f}
 }
+@media(max-width:600px){.hdr-text-hide{display:none}}
 
 /* ─── TREE (Дерево связей) ─── */
 .tree-page{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative}
@@ -1393,25 +1393,51 @@ label.tb{line-height:1}
 </head>
 <body>
 
-<!-- AUTH SCREEN -->
+<!-- CAMPAIGN SELECT SCREEN -->
 <div id="authScreen">
-  <div class="auth-box">
+  <div class="auth-box" style="max-width:440px;width:95vw">
     <div class="auth-logo">World<span>Forge</span></div>
-    <div class="auth-sub">Войдите, чтобы управлять своими мирами</div>
-    <div class="auth-tabs">
-      <div class="auth-tab act" id="authTabLogin" onclick="switchAuthTab('login')">Вход</div>
-      <div class="auth-tab" id="authTabReg" onclick="switchAuthTab('reg')">Регистрация</div>
+    <div class="auth-sub" style="margin-bottom:24px">Выберите кампанию или создайте новую</div>
+
+    <!-- Existing campaigns -->
+    <div id="campSelectSection">
+      <div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--t3);margin-bottom:8px">Войти в кампанию</div>
+      <select id="campSelectDropdown" class="auth-fi" style="cursor:pointer;appearance:auto;-webkit-appearance:auto;color:#111;background:#fff"
+        onchange="onCampDropdownChange()">
+        <option value="">— выберите кампанию —</option>
+      </select>
+      <div id="campSelectInfo" style="display:none;margin-top:8px;padding:10px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--border);font-size:12px;color:var(--t2);align-items:center;gap:8px">
+        <i class="ti ti-lock" style="color:var(--amber);font-size:14px" id="campSelectLockIco"></i>
+        <span id="campSelectInfoTxt"></span>
+      </div>
+      <button class="auth-btn-p" onclick="enterCampFromDropdown()" id="campEnterBtn" style="margin-top:10px;display:none">
+        <i class="ti ti-door-enter" style="margin-right:6px"></i>Войти
+      </button>
+      <div id="campSelectEmpty" style="display:none;text-align:center;font-size:12px;color:var(--t3);padding:8px 0;font-style:italic">Нет кампаний</div>
     </div>
-    <button class="auth-google-btn" onclick="authGoogle()">
-      <svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.34-8.16 2.34-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
-      Войти через Google
-    </button>
-    <div class="auth-divider">или</div>
-    <input class="auth-fi" id="authEmail" type="email" placeholder="Email" autocomplete="email">
-    <input class="auth-fi" id="authPass" type="password" placeholder="Пароль" autocomplete="current-password" onkeydown="if(event.key==='Enter')authSubmit()">
-    <input class="auth-fi" id="authPassConf" type="password" placeholder="Повторите пароль" style="display:none" autocomplete="new-password" onkeydown="if(event.key==='Enter')authSubmit()">
-    <button class="auth-btn-p" onclick="authSubmit()" id="authSubmitBtn">Войти</button>
-    <div class="auth-err" id="authErr"></div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin:20px 0">
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+      <span style="font-size:11px;color:var(--t4)">или</span>
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+    </div>
+
+    <!-- Create new campaign -->
+    <div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--t3);margin-bottom:8px">Новая кампания</div>
+      <input class="auth-fi" id="newCampName" placeholder="Название кампании..." autocomplete="off"
+        onkeydown="if(event.key==='Enter')document.getElementById('newCampPin').focus()">
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+        <input class="auth-fi" id="newCampPin" placeholder="Пин-код (4 цифры)" maxlength="4" inputmode="numeric" pattern="[0-9]*"
+          style="font-family:'JetBrains Mono',monospace;letter-spacing:4px;flex:1"
+          onkeydown="if(event.key==='Enter')createCampFromLanding()">
+        <i class="ti ti-lock" style="color:var(--accent2);font-size:16px;flex-shrink:0" title="Пин обязателен"></i>
+      </div>
+      <div class="auth-err" id="newCampErr" style="margin-top:6px"></div>
+      <button class="auth-btn-p" onclick="createCampFromLanding()" style="margin-top:10px;background:var(--glass2);border:1px solid var(--border2);color:var(--t2)" onmouseover="this.style.background='var(--accent)';this.style.color='#fff'" onmouseout="this.style.background='var(--glass2)';this.style.color='var(--t2)'">
+        <i class="ti ti-plus" style="margin-right:5px"></i>Создать кампанию
+      </button>
+    </div>
   </div>
 </div>
 
@@ -1466,11 +1492,9 @@ label.tb{line-height:1}
     </div>
     <button class="mob-icon-btn" onclick="openSearch()"><i class="ti ti-search"></i></button>
     <div class="save-pip" id="savePip" title="Статус сохранения"></div>
-    <div class="auth-user-badge" id="userBadge" onclick="authSignOut()" title="Выйти" style="display:none">
-      <i class="ti ti-user-circle" id="userBadgeIco"></i>
-      <span id="userBadgeName" style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-      <i class="ti ti-logout" style="font-size:12px;color:var(--t4)"></i>
-    </div>
+    <button class="hdr-btn" onclick="goToCampSelect()" title="Сменить кампанию" style="display:flex;align-items:center;gap:5px">
+      <i class="ti ti-layout-grid"></i><span class="hdr-text-hide">Кампании</span>
+    </button>
   </header>
 
   <div class="body">
@@ -1486,8 +1510,8 @@ label.tb{line-height:1}
           <button class="sb-create-btn" onclick="sbCreateCamp()">+ Создать</button>
         </div>
         <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
-          <input class="sb-inp" id="sbCampPin" placeholder="Пин (4 цифры, необязательно)" maxlength="4" inputmode="numeric" pattern="[0-9]*" style="font-family:'JetBrains Mono',monospace;letter-spacing:3px">
-          <i class="ti ti-lock" style="color:var(--t4);font-size:14px;flex-shrink:0" title="Пин-код при входе"></i>
+          <input class="sb-inp" id="sbCampPin" placeholder="Пин-код (4 цифры, обязательно)" maxlength="4" inputmode="numeric" pattern="[0-9]*" style="font-family:'JetBrains Mono',monospace;letter-spacing:3px" required>
+          <i class="ti ti-lock" style="color:var(--accent2);font-size:14px;flex-shrink:0" title="Пин обязателен"></i>
         </div>
       </div>
       <!-- Nav -->
@@ -1568,6 +1592,7 @@ label.tb{line-height:1}
                   <input type="file" accept="image/*" multiple style="display:none" onchange="wikiHandleImgFiles(event)">
                   <i class="ti ti-photo-plus"></i>
                 </label>
+                <button class="tb" onclick="wikiInsImgUrl()" title="Вставить изображение по URL"><i class="ti ti-link"></i><i class="ti ti-photo" style="font-size:10px;margin-left:-3px"></i></button>
                 <div class="tbsep"></div>
                 <button class="tb" onclick="f('undo')" title="Отменить"><i class="ti ti-arrow-back-up"></i></button>
                 <button class="tb" onclick="f('redo')" title="Повторить"><i class="ti ti-arrow-forward-up"></i></button>
@@ -1944,123 +1969,161 @@ let campId=null,camps=[],entries=[],chars=[],media=[],kCards=[],tlEvents=[];
 let activeId=null,openTabs=[],saveTimer=null;
 let curTagC=0,curKcC='kc0',curColC='var(--t3)',curCharId=null,charRes=[];
 let mediaFilter='all',dragCardId=null,selEType='wiki',collSec=new Set();
-let currentUser=null;
 
 const CATS=[{id:'world',lbl:'Мир',ico:'ti-world'},{id:'location',lbl:'Локации',ico:'ti-building-castle'},{id:'npc',lbl:'NPC',ico:'ti-user-circle'},{id:'faction',lbl:'Фракции',ico:'ti-shield-half'},{id:'item',lbl:'Предметы',ico:'ti-diamond'},{id:'lore',lbl:'Лор',ico:'ti-scroll'}];
 const TICONS={wiki:'ti-article',kanban:'ti-layout-kanban',timeline:'ti-timeline',map:'ti-map-2'};
 const TPAGE={wiki:'wiki',kanban:'kanban',timeline:'timeline',map:'map'};
 const ATTRS=['СИЛ','ЛОВ','ТЕЛ','ИНТ','МДР','ХАР'];
 
-// ═══════ AUTH UI ═══════
-let _authMode='login';
-function switchAuthTab(mode){
-  _authMode=mode;
-  g('authTabLogin').classList.toggle('act',mode==='login');
-  g('authTabReg').classList.toggle('act',mode==='reg');
-  g('authPassConf').style.display=mode==='reg'?'':'none';
-  g('authSubmitBtn').textContent=mode==='login'?'Войти':'Зарегистрироваться';
-  g('authErr').textContent='';
-}
-async function authSubmit(){
-  const email=g('authEmail').value.trim(),pass=g('authPass').value;
-  g('authErr').textContent='';
-  if(!email||!pass){g('authErr').textContent='Заполните email и пароль';return;}
-  try{
-    if(_authMode==='reg'){
-      const conf=g('authPassConf').value;
-      if(pass!==conf){g('authErr').textContent='Пароли не совпадают';return;}
-      await auth.createUserWithEmailAndPassword(email,pass);
-    }else{
-      await auth.signInWithEmailAndPassword(email,pass);
-    }
-  }catch(e){
-    const msg={
-      'auth/user-not-found':'Пользователь не найден',
-      'auth/wrong-password':'Неверный пароль',
-      'auth/email-already-in-use':'Email уже используется',
-      'auth/weak-password':'Пароль слишком короткий (мин. 6 символов)',
-      'auth/invalid-email':'Некорректный email',
-      'auth/invalid-credential':'Неверный email или пароль',
-    }[e.code]||e.message;
-    g('authErr').textContent=msg;
-  }
-}
-async function authGoogle(){
-  g('authErr').textContent='';
-  try{
-    const provider=new firebase.auth.GoogleAuthProvider();
-    await auth.signInWithPopup(provider);
-  }catch(e){g('authErr').textContent=e.message;}
-}
-async function authSignOut(){
-  if(!confirm('Выйти из аккаунта?'))return;
-  await auth.signOut();
-}
-function updateUserBadge(user){
-  const badge=g('userBadge');
-  if(!user){badge.style.display='none';return;}
-  badge.style.display='flex';
-  g('userBadgeName').textContent=user.displayName||user.email?.split('@')[0]||'Пользователь';
-  const ico=g('userBadgeIco');
-  if(user.photoURL){
-    ico.outerHTML=`<img id="userBadgeIco" src="${user.photoURL}" style="width:22px;height:22px;border-radius:50%">`;
-  }
-}
-
 // ═══════ BOOT ═══════
 (function boot(){
-  // Wait until firebase global is available (CDN scripts may load slightly after)
   function tryInit(){
-    if(typeof firebase==='undefined'){
-      setTimeout(tryInit,50);return;
-    }
+    if(typeof firebase==='undefined'){setTimeout(tryInit,50);return;}
     try{
       firebase.initializeApp(FB);
       db=firebase.firestore();
       storage=firebase.storage();
-      auth=firebase.auth();
-      auth.onAuthStateChanged(user=>{
-        currentUser=user;
-        updateUserBadge(user);
-        if(user){
-          g('authScreen').style.display='none';
-          startApp();
-        }else{
-          g('authScreen').style.display='flex';
-          g('loading').style.display='none';
-          g('app').style.display='none';
-        }
-      });
-    }catch(e){
-      console.error('Firebase init error:',e);
-      showErr(e.message);
-    }
+      startLanding();
+    }catch(e){console.error('Firebase init error:',e);showErr(e.message);}
   }
   tryInit();
 })();
 
-async function startApp(){
+async function startLanding(){
   g('loading').style.display='flex';
-  setMsg('Загрузка...');
+  setMsg('Загрузка кампаний...');
   try{
     await loadCamps();
   }catch(e){
-    console.error('loadCamps error:',e);
     showErr('Ошибка подключения к Firestore: '+e.message+'\n\nПроверьте правила:\nallow read, write: if true;');
     return;
   }
-  try{
-    const last=localStorage.getItem('wf_c');
-    if(last&&camps.find(c=>c.id===last)){
-      campId=last;
-      await loadData();
+  g('loading').style.display='none';
+  renderCampSelectList();
+  g('authScreen').style.display='flex';
+}
+
+function renderCampSelectList(){
+  const dd=g('campSelectDropdown');
+  const empty=g('campSelectEmpty');
+  const btn=g('campEnterBtn');
+  if(!dd)return;
+  dd.innerHTML='<option value="">— выберите кампанию —</option>';
+  if(!camps.length){
+    if(empty)empty.style.display='block';
+    dd.style.display='none';
+    if(btn)btn.style.display='none';
+    return;
+  }
+  if(empty)empty.style.display='none';
+  dd.style.display='block';
+  camps.forEach(c=>{
+    const opt=document.createElement('option');
+    opt.value=c.id;
+    opt.textContent=(String(c.pin||'').trim().length===4?'🔒 ':'📖 ')+c.name;
+    opt.style.color='#111';opt.style.background='#fff';
+    dd.appendChild(opt);
+  });
+  // Restore last used
+  const last=localStorage.getItem('wf_c');
+  if(last&&camps.find(c=>c.id===last)){dd.value=last;onCampDropdownChange();}
+}
+
+function onCampDropdownChange(){
+  const id=g('campSelectDropdown')?.value;
+  const info=g('campSelectInfo');
+  const infoTxt=g('campSelectInfoTxt');
+  const lockIco=g('campSelectLockIco');
+  const btn=g('campEnterBtn');
+  if(!id){
+    if(info)info.style.display='none';
+    if(btn)btn.style.display='none';
+    return;
+  }
+  const c=camps.find(x=>x.id===id);
+  if(!c)return;
+  if(btn)btn.style.display='block';
+  if(info){
+    const pin=String(c.pin||'').trim();
+    if(pin.length===4){
+      info.style.display='flex';
+      lockIco.className='ti ti-lock';lockIco.style.color='var(--amber)';
+      infoTxt.textContent='Кампания защищена пин-кодом';
+    } else {
+      info.style.display='none';
     }
+  }
+}
+
+function enterCampFromDropdown(){
+  const id=g('campSelectDropdown')?.value;
+  if(!id){notify('Выберите кампанию','inf');return;}
+  enterCamp(id);
+}
+
+function enterCamp(id){
+  const c=camps.find(x=>x.id===id);if(!c)return;
+  const pin=String(c.pin||'').trim();
+  if(pin.length===4){
+    openPinScreen(pin,()=>_doEnterCamp(id));
+  } else {
+    _doEnterCamp(id);
+  }
+}
+
+async function _doEnterCamp(id){
+  g('authScreen').style.display='none';
+  g('loading').style.display='flex';
+  setMsg('Загрузка...');
+  campId=id;localStorage.setItem('wf_c',id);
+  const c=camps.find(x=>x.id===id);
+  g('hdrCamp').textContent=c?c.name:'—';
+  try{
+    await loadData();
   }catch(e){
-    console.error('loadData error:',e);
+    notify('Ошибка загрузки: '+e.message,'err');
   }
   g('loading').style.display='none';
   g('app').style.display='flex';
   renderSbCamps();renderSbSec();renderHome();initMob();
+}
+
+function goToCampSelect(){
+  campId=null;entries=[];chars=[];media=[];kCards=[];tlEvents=[];
+  openTabs=[];activeId=null;
+  g('app').style.display='none';
+  g('hdrCamp').textContent='—';
+  // Reset dropdown state
+  const btn=g('campEnterBtn');if(btn)btn.style.display='none';
+  const info=g('campSelectInfo');if(info)info.style.display='none';
+  renderCampSelectList();
+  g('authScreen').style.display='flex';
+}
+
+async function createCampFromLanding(){
+  const nameInp=g('newCampName'),pinInp=g('newCampPin'),errEl=g('newCampErr');
+  const name=(nameInp.value||'').trim();
+  const pinRaw=(pinInp.value||'').replace(/\D/g,'');
+  errEl.textContent='';
+  if(!name){errEl.textContent='Введите название кампании';nameInp.focus();return;}
+  if(pinRaw.length!==4){errEl.textContent='Введите пин-код — ровно 4 цифры';pinInp.focus();return;}
+  nameInp.disabled=true;pinInp.disabled=true;
+  try{
+    const ref=await db.collection('campaigns').add({name,pin:pinRaw,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    camps.unshift({id:ref.id,name,pin:pinRaw});
+    nameInp.value='';pinInp.value='';
+    nameInp.disabled=false;pinInp.disabled=false;
+    // Refresh dropdown then auto-enter
+    renderCampSelectList();
+    enterCamp(ref.id);
+  }catch(e){
+    nameInp.disabled=false;pinInp.disabled=false;
+    errEl.textContent='Ошибка: '+e.message;
+  }
+}
+
+async function startApp(){
+  // kept for compatibility — not used in new flow
 }
 
 function setMsg(m){const el=g('loading-msg');if(el)el.textContent=m;}
@@ -2095,13 +2158,12 @@ function renderSbCamps(){
 async function sbCreateCamp(){
   const inp=g('sbCampInp'),name=inp.value.trim();
   const pinInp=g('sbCampPin'),pinRaw=(pinInp?.value||'').replace(/\D/g,'');
-  const pin=pinRaw.length===4?pinRaw:'';
   if(!name){inp.focus();return;}
-  if(pinRaw&&pinRaw.length!==4){notify('Пин должен быть ровно 4 цифры','inf');pinInp.focus();return;}
+  if(pinRaw.length!==4){notify('Пин должен быть ровно 4 цифры','inf');pinInp?.focus();return;}
   inp.disabled=true;
   try{
-    const ref=await db.collection('campaigns').add({name,pin,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
-    camps.unshift({id:ref.id,name,pin});inp.value='';if(pinInp)pinInp.value='';inp.disabled=false;
+    const ref=await db.collection('campaigns').add({name,pin:pinRaw,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    camps.unshift({id:ref.id,name,pin:pinRaw});inp.value='';if(pinInp)pinInp.value='';inp.disabled=false;
     await switchCamp(ref.id);notify('Кампания «'+name+'» создана','ok');
   }catch(e){inp.disabled=false;notify('Ошибка: '+e.message,'err')}
 }
@@ -2118,11 +2180,9 @@ function setCampPin(id,name){
 }
 async function switchCamp(id){
   const c=camps.find(x=>x.id===id);
-  const pin=c?.pin?String(c.pin):'';
+  const pin=String(c?.pin||'').trim();
   if(pin.length===4){
-    openPinScreen(pin,async()=>{
-      await _doSwitchCamp(id);
-    });
+    openPinScreen(pin,async()=>{ await _doSwitchCamp(id); });
     return;
   }
   await _doSwitchCamp(id);
@@ -3670,8 +3730,14 @@ function createWikiImgWrap(src, name, initW){
 
   const img=document.createElement('img');
   img.src=src;img.alt=name||'';
-  img.style.width=initW+'px';
+  // For URL images: don't set fixed width so they size naturally; for uploads use initW
+  if(src.startsWith('http')){
+    img.style.maxWidth='100%';img.style.width='auto';
+  } else {
+    img.style.width=(initW||320)+'px';
+  }
   img.draggable=false;
+  img.onerror=function(){this.style.outline='2px dashed var(--red)';this.title='Изображение недоступно: '+src;};
   wrap.appendChild(img);
 
   // Float alignment buttons
@@ -3764,6 +3830,7 @@ document.addEventListener('mousedown',e=>{
     setupWikiSlash();
     body.addEventListener('paste',function(ev){
       const items=ev.clipboardData?.items||[];
+      // Check for image file first
       for(const item of items){
         if(item.type.startsWith('image/')){
           ev.preventDefault();
@@ -3771,6 +3838,22 @@ document.addEventListener('mousedown',e=>{
           const reader=new FileReader();
           reader.onload=e=>{ wikiInsertImageAtCursor(e.target.result,'paste.png',body);schedSave(); };
           reader.readAsDataURL(file);
+          return;
+        }
+      }
+      // Check for pasted text that looks like an image URL
+      for(const item of items){
+        if(item.type==='text/plain'){
+          item.getAsString(txt=>{
+            const u=(txt||'').trim();
+            const isImgUrl=/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(u)||
+              (u.startsWith('http')&&(/imgur\.com|cloudinary\.com|unsplash\.com|i\.redd\.it|postimg\.cc|ibb\.co/.test(u)));
+            if(isImgUrl){
+              // Prevent default text insertion & insert as image
+              document.execCommand('delete');
+              setTimeout(()=>{wikiInsertImageAtCursor(u,'url-image',body);schedSave();},10);
+            }
+          });
         }
       }
     });
@@ -3841,6 +3924,21 @@ function wikiSerialize(body){
 function wikiInsLink(){
   const u=prompt('URL:');
   if(u){const body=g('wikiBody');if(body)body.focus();document.execCommand('createLink',false,u);}
+}
+function wikiInsImgUrl(){
+  const url=prompt('Ссылка на изображение (URL):');
+  if(!url||!url.trim())return;
+  const u=url.trim();
+  // Detect image URL
+  const isImg=/\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?.*)?$/i.test(u)||u.includes('imgur')||u.includes('cloudinary')||u.includes('unsplash')||u.includes('upload')||u.includes('image');
+  if(isImg||confirm('Вставить как изображение?')){
+    const body=g('wikiBody');if(!body)return;
+    wikiInsertImageAtCursor(u,'url-image',body);
+    schedSave();
+  } else {
+    const body=g('wikiBody');if(body)body.focus();
+    document.execCommand('createLink',false,u);
+  }
 }
 function wikiInsCode(){
   const body=g('wikiBody');if(body)body.focus();
